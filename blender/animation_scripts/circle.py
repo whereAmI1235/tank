@@ -1,5 +1,4 @@
 import math
-import sys
 
 def to_deg(rad):
     return rad * (180/math.pi)
@@ -10,6 +9,14 @@ def to_rad(deg):
 RAD_90 = to_rad(90)
 RAD_180 = to_rad(180)
 PI = math.pi
+
+def get_distance_between_points(vec1, vec2):
+    x_change = vec2[0] - vec1[0]
+    y_change = vec2[1] - vec1[1]
+    z_change = vec2[2] - vec1[2]
+    hypot = math.sqrt(x_change ** 2 + y_change ** 2)
+    radius = math.sqrt(hypot ** 2 + z_change ** 2) 
+    return radius
 
 def calculate_tangent_angle(radius, angle_deg):
     print(f"calculate tangent angle for {angle_deg}")
@@ -38,31 +45,52 @@ def points_on_circle(r,n=100, starting_angle = 0):
     print(start_position)
     return [(round(math.cos(start_position-(step*x))*r, 2),round(math.sin(start_position-(step*x))*r,2)) for x in range(n)]
 
-def rotate_on_axis(starting_angular_position, rotation_angle, distance_from_axis, clockwise_rotation = -1):
-    start_1 = round(math.cos(starting_angular_position)*distance_from_axis, 2)
-    start_2 = round(math.sin(starting_angular_position)*distance_from_axis, 2)
-    new_1 = round(math.cos(starting_angular_position + rotation_angle*(clockwise_rotation))*distance_from_axis, 5)
-    new_2 = round(math.sin(starting_angular_position + rotation_angle*(clockwise_rotation))*distance_from_axis, 5)
+def calculate_axis_angle(run, rise):
+    round_run = round(run, 2)
+    round_rise = round(rise, 2)
+    if round_rise == 0 and round_run == 0:
+        return 0
+    ''' take arctan of round_rise over round_run (opposite over adjacent) to get angle '''
+    if round_rise > 0 and round_run > 0 or (round_rise == 0 and round_run > 0):
+        quadrant = 0
+    if round_rise > 0 and round_run < 0 or (round_rise > 0 and round_run == 0):
+        quadrant = PI/2
+    if round_rise < 0 and round_run < 0 or (round_rise == 0 and round_run < 0):
+        quadrant = PI
+    if round_rise < 0 and round_run > 0 or (round_rise < 0 and round_run == 0):
+        quadrant = PI* 3/2 
+    angle = abs(math.atan(rise/run)) if round_run != 0 else 0 
+    print(f"current angle {to_deg(angle + quadrant)}")
+    return angle + quadrant
+
+def calculate_tangent_for_vector(vector, vertex):
+    '''calculate the angles that allow an object to lie flat on a shpere's surface'''    
+    x, y, z = vector[0], vector[1], vector[2]
+    radius = get_distance_between_points(vector, vertex)
+    x_tan = calculate_tangent_angle(radius, calculate_axis_angle(z, y))
+    y_tan = calculate_tangent_angle(radius, calculate_axis_angle(z, x))
+    z_tan = calculate_tangent_angle(radius, calculate_axis_angle(x, y))
+    return x_tan, y_tan, z_tan
+
+def rotate_on_axis(starting_angular_position, rotation_angle, radius, clockwise_rotation = -1):
+    start_1 = round(math.cos(starting_angular_position)*radius, 5)
+    start_2 = round(math.sin(starting_angular_position)*radius, 5)
+    new_1 = round(math.cos(starting_angular_position + rotation_angle*(clockwise_rotation))*radius, 5)
+    new_2 = round(math.sin(starting_angular_position + rotation_angle*(clockwise_rotation))*radius, 5)
     change_1 = round(new_1 - start_1,5)
     change_2 = round(new_2 - start_2,5)
+    # start_1 = math.cos(starting_angular_position)*radius
+    # start_2 = math.sin(starting_angular_position)*radius
+    # new_1 = math.cos(starting_angular_position + rotation_angle*(clockwise_rotation))*radius
+    # new_2 = math.sin(starting_angular_position + rotation_angle*(clockwise_rotation))*radius
+    # change_1 = new_1 - start_1
+    # change_2 = new_2 - start_2
     return change_1, change_2
 
-def calculate_axis_angle(run, rise):
-    if rise == 0 and run == 0:
-        return 0
-    ''' take arctan of rise over run (opposite over adjacent) to get angle '''
-    if rise > 0 and run > 0 or (rise == 0 and run > 0):
-        quadrant = 0
-    if rise > 0 and run < 0 or (rise > 0 and run == 0):
-        quadrant = PI/2
-    if rise < 0 and run < 0 or (rise == 0 and run < 0):
-        quadrant = PI
-    if rise < 0 and run > 0 or (rise < 0 and run == 0):
-        quadrant = PI* 3/2 
-    new = abs(math.atan(rise/run)) if run != 0 else 0 
-    return new + quadrant
 
 def process_axis_rotation(object_coord, vertex_coord, axis_no, angle, clockwise):
+    if angle == 0:
+        return object_coord
     rise = 0
     run = 0
     # rise is y and run is z for x axis rotation
@@ -78,7 +106,9 @@ def process_axis_rotation(object_coord, vertex_coord, axis_no, angle, clockwise)
         rise = 1
         run = 0
     rise_change = object_coord[rise] - vertex_coord[rise]
+    print(f"rise change {rise_change}")
     run_change = object_coord[run] - vertex_coord[run]
+    print(f"run change {run_change}")
     # run, rise
     run_after, rise_after = rotate_on_axis(calculate_axis_angle(run_change, rise_change), angle, math.hypot(run_change, rise_change), clockwise)
     object_coord[run] += run_after 
@@ -95,12 +125,12 @@ def process_axis_rotation(object_coord, vertex_coord, axis_no, angle, clockwise)
 # the x axis pointing up and the z axis to the right
 # In a right handed coordinate systems z axis rotation is calculated looking from +z toward -z with 
 # the y axis pointing up and the x axis to the right
-def vertex_rotation_new(steps, angles = [0,0,0], vertex_location = [0,0,0], obj_coord = [0,0,0], clockwise = [-1,-1,-1]):
-    print(obj_coord)
+def vertex_rotation_new(angles = [0,0,0], vertex_location = [0,0,0], obj_coord = [0,0,0], clockwise = [-1,-1,-1]):
     obj_coord = process_axis_rotation(obj_coord, vertex_location, 0, angles[0], clockwise[0])
     obj_coord = process_axis_rotation(obj_coord, vertex_location, 1, angles[1], clockwise[1])
     obj_coord = process_axis_rotation(obj_coord, vertex_location, 2, angles[2], clockwise[2])
-    print(obj_coord)
+    print(f'New Object coord {obj_coord}')
+    return obj_coord
 
 # z axis is fixed by the radius, therefore these are only x and y changes
 # so we yust need to determine angle in the terms of x and y
@@ -110,11 +140,7 @@ def vertex_rotation_new(steps, angles = [0,0,0], vertex_location = [0,0,0], obj_
 # rotation around 3 axis give a "spherical" pattern where the diagonal pattern is not moved around to fill a 3d space
 # angles in radians
 def vertex_rotation(steps, angles = [0,0,0], vertex_location = [0,0,0], obj_coord = [0,0,0], clockwise = True, starting_position = math.pi/2):
-    x_change = obj_coord[0] - vertex_location[0]
-    y_change = obj_coord[1] - vertex_location[1]
-    z_change = obj_coord[2] - vertex_location[2]
-    hypot = math.sqrt(x_change ** 2 + y_change ** 2)
-    radius = math.sqrt(hypot ** 2 + z_change ** 2) 
+    radius = get_distance_between_points(vertex_location, obj_coord)
     step_x = angles[0] / steps
     step_y = angles[1] / steps
     step_z = angles[2] / steps
@@ -154,25 +180,3 @@ def travel_around_circle_generator(points):
     yield (points[-1][0] - points[0][0], points[-1][1] - points[0][1])
 
 
-
-# r = 1.0
-# y = math.sqrt(.5)
-# y = .9
-# x = math.sqrt(r ** 2 - y ** 9)
-# tan_angle = calculate_tangent_angle(1, float(sys.argv[1]))
-# print(f"tangent angle {to_deg(tan_angle)}")
-
-# alpha = to_deg(math.asin(y/r)) 
-# beta = 180 - (90 + alpha)
-# hypot = r / math.sin(to_rad(beta))
-# z = hypot - x
-# c = math.sqrt(z **2 + y **2)
-# delta = to_deg(math.asin(z/c))
-# psi = 180 - (delta + 90)
-# print(f"alpha {alpha}")
-# print(f"x {x}")
-# print(f"beta {beta}")
-# print(f"hypot {hypot}")
-# print(f"z {z}")
-# print(f"delta {delta}")
-# print(f"psi {psi}")
